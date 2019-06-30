@@ -24,7 +24,8 @@ SOFTWARE.
 #pragma once
 
 #include <vector>
-
+#include <mutex>
+#include <assert.h>
 /*
 * Event Class Instantiated with template arguments that will be used during Dispatch.
 */
@@ -86,6 +87,17 @@ public:
 		m_EventSubsribers.clear();
 	}
 
+	Event(const Event& Rhs) 
+	{
+		std::lock_guard<std::mutex> Lock(m_Mutex);
+		for (size_t i = 0; i < m_EventSubsribers.size(); i++)
+		{
+			BaseEventSubscription* CopiedSubscriber = new BaseEventSubscription();
+			&CopiedSubscriber = &m_EventSubsribers[i];
+			Rhs.m_EventSubsribers.push_back(CopiedSubscriber);
+		}
+	}
+
 	/*
 	* @Description: Registers a new Object and Member Function to the Event. Event will call registered function on Dispatch()
 	* @Param[in] Object: Subscriber object
@@ -95,6 +107,7 @@ public:
 	template<typename SubscriberType>
 	void Register(SubscriberType* Object, void(SubscriberType::*FunctionPtr)(Args...)) 
 	{
+		std::lock_guard<std::mutex> Lock(m_Mutex);
 		EventSubscription<SubscriberType, Args...>* Subscriber = new EventSubscription<SubscriberType, Args...>(Object, FunctionPtr);
 		m_EventSubsribers.push_back(Subscriber);
 	}
@@ -104,6 +117,8 @@ public:
 	*/
 	void UnregisterAll() 
 	{
+		std::lock_guard<std::mutex> Lock(m_Mutex);
+
 		for (size_t i = 0; i < m_EventSubsribers.size(); i++)
 		{
 			delete m_EventSubsribers[i];
@@ -116,6 +131,8 @@ public:
 	*/
 	void Dispatch(Args... args) 
 	{
+		std::lock_guard<std::mutex> Lock(m_Mutex);
+
 		for (BaseEventSubscription<Args...>* Subscriber : m_EventSubsribers)
 		{
 			if (Subscriber)
@@ -128,5 +145,7 @@ public:
 private:
 
 	std::vector<BaseEventSubscription<Args...>*> m_EventSubsribers;
+
+	std::mutex m_Mutex;
 
 };
